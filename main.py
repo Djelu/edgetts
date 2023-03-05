@@ -6,6 +6,8 @@ import time
 from faker import Faker
 import edge_tts
 
+REPEAT_REQUEST_COUNT = 10
+
 
 async def foo(buffer_size):
     text = get_text()
@@ -39,9 +41,9 @@ async def run_it_with_buffer(sentences, buffer_size):
         mp3_parts = await tts_all(buffered_sentences, ext_num)
         result.append(mp3_parts)
 
-        # for mp3_part in mp3_parts:
-        #     with open(f"test/test_{buffer_index+1}.mp3", "wb") as f:
-        #         f.write(mp3_part[0])
+        for mp3_index, mp3_part in enumerate(mp3_parts):
+            with open(f"test/test_{buffer_index+1}_{mp3_index+1}.mp3", "wb") as f:
+                f.write(mp3_part[mp3_index])
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -58,7 +60,7 @@ def get_splited_sentences(sentences, count):
 def prepare_splited_text(text, buffer_size, first_strings_len, last_strings_len):
     words = text.split(" ")
     first_part = strip_strings(words, first_strings_len, buffer_size)
-    last_part = strip_strings(words[first_part['last_word_index']+1:], last_strings_len)
+    last_part = strip_strings(words[first_part['last_word_index'] + 1:], last_strings_len)
     return [*first_part['result'], *last_part['result']]
 
 
@@ -85,17 +87,23 @@ async def tts_all(sentences, ext_num):
 
 async def tts_one(index, text):
     print(f"th{index + 1} started")
-    communicate = edge_tts.Communicate(text, 'ru-RU-SvetlanaNeural', rate = "+100%")
-    bytes_io = io.BytesIO()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            bytes_io.write(chunk["data"])
-    audio_bytes = bytes_io.getvalue()
-    # with open(f"test/test_{index+1}.mp3", "wb") as f:
-    #     f.write(audio_bytes)
-    # with open(f"test/test_{index + 1}.txt", "wb") as f:
-    #     f.write(text.encode("utf-8"))
-    print(f"th{index + 1} completed")
+    for repeat_num in range(0, REPEAT_REQUEST_COUNT):
+        repeat_str = f"repeat{repeat_num} "
+        try:
+            communicate = edge_tts.Communicate(text, 'ru-RU-SvetlanaNeural', rate="+100%")
+            bytes_io = io.BytesIO()
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    bytes_io.write(chunk["data"])
+            audio_bytes = bytes_io.getvalue()
+            # with open(f"test/test_{index+1}.mp3", "wb") as f:
+            #     f.write(audio_bytes)
+            # with open(f"test/test_{index + 1}.txt", "wb") as f:
+            #     f.write(text.encode("utf-8"))
+            print(f"{repeat_str}th{index + 1} completed")
+            break
+        except Exception as ex:
+            print(f"{repeat_str}th{index + 1}={ex}")
     return {index: audio_bytes}
 
 
@@ -108,7 +116,7 @@ def write_to_file(mp3_parts):
 
 
 def get_text():
-    with open('textFull.txt', 'r', encoding='utf-8') as file:
+    with open('text.txt', 'r', encoding='utf-8') as file:
         text = file.read()
     return text
 
@@ -118,6 +126,17 @@ def get_fake_text(length):
     return faker.text(max_nb_chars=length)
 
 
+async def test_it(text):
+    communicate = edge_tts.Communicate(text, 'ru-RU-SvetlanaNeural', rate="+100%")
+    bytes_io = io.BytesIO()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            bytes_io.write(chunk["data"])
+    audio_bytes = bytes_io.getvalue()
+    return audio_bytes
+
+
 if __name__ == '__main__':
     asyncio.run(foo(20))
+    # asyncio.run(test_it(get_text()))
     i = 0
