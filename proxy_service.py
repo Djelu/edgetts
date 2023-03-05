@@ -1,3 +1,5 @@
+import json
+
 import requests
 import http.client
 
@@ -86,7 +88,8 @@ from fake_useragent import UserAgent
 #     return proxy_list
 
 
-def get_proxy_info(proxy_count):
+def get_proxy_info(proxy_count=None):
+    return read_from_json()
     conn = http.client.HTTPSConnection("hidemy.name")
     headers = {
         'cookie': "cf_clearance=76YHMKbsvXpv9UcHbjd1o1vpkF8YQ5l_ARQp66E7gGQ-1677956234-0-160; _ym_uid=167795624013051281; _ym_d=1677956240; _ym_isad=1; _gid=GA1.2.618453944.1677956240; _tt_enable_cookie=1; _ttp=Q_OcDWcpOLRAQqrS-d6hq19jN7g; PAPVisitorId=b24807e1048f03dc754c93lIzRqjh9AQ; PAPVisitorId=b24807e1048f03dc754c93lIzRqjh9AQ; _ga_KJFZ3PJZP3=GS1.1.1677959665.2.1.1677959669.0.0.0; _ga=GA1.1.252897160.1677956240",
@@ -105,22 +108,50 @@ def get_proxy_info(proxy_count):
         'user-agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     }
 
-    conn.request("GET", "/en/proxy-list/?maxtime=500&type=hs&anon=34#list", headers=headers)
-
+    url = "/en/proxy-list/?maxtime=1000&type=hs&anon=34"
+    conn.request("GET", url, headers=headers)
     res = conn.getresponse()
     html = res.read()
     soup = BeautifulSoup(html, "html.parser")
-    proxy_table = soup.find("table")
 
     proxies = []
-    for row in proxy_table.tbody.find_all("tr"):
-        cells = row.find_all("td")
-        if len(cells) < 7:
-            continue
-        address = cells[0].text.strip()
-        port = cells[1].text.strip()
-        proxies.append({"address": address, "port": port})
-        if len(proxies) == proxy_count:
-            break
+    pagination = soup.find("div", {"class": "pagination"})
+    pages = pagination.find_all("li", class_=lambda x: not x or 'is-active' in x.split() or 'active' in x.split())
+                    # lambda x: x and 'prev_array' not in x.split() and 'next_array' not in x.split()
+    for skip_proxy_count in range(0, len(pages)):
+        if skip_proxy_count > 0:
+            conn.request("GET", f"{url}&start={skip_proxy_count*64}", headers=headers)
+            res = conn.getresponse()
+            html = res.read()
+            soup = BeautifulSoup(html, "html.parser")
+        proxy_table = soup.find("table")
+        for row in proxy_table.tbody.find_all("tr"):
+            cells = row.find_all("td")
+            if len(cells) < 7:
+                continue
+            address = cells[0].text.strip()
+            port = cells[1].text.strip()
+            proxies.append({"address": address, "port": port})
+            if proxy_count is not None and len(proxies) == proxy_count:
+                break
     conn.close()
     return proxies
+
+
+def write_as_json(proxies):
+    with open('proxies.json', 'w') as f:
+        json.dump(proxies, f)
+
+
+def read_from_json():
+    with open("proxies.json", "r") as f:
+        return json.load(f)
+
+
+# proxies = [{'address': '80.179.140.189', 'port': '80'},
+#            {'address': '116.117.253.212', 'port': '9002'},
+#            {'address': '58.18.223.212', 'port': '9002'}]
+# proxies = get_proxy_info()
+# write_as_json(proxies)
+# proxies = read_from_json()
+# i = 0
