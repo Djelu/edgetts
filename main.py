@@ -41,9 +41,11 @@ async def run_it_with_buffer(sentences, buffer_size):
         mp3_parts = await tts_all(buffered_sentences, ext_num)
         result.append(mp3_parts)
 
-        for mp3_index, mp3_part in enumerate(mp3_parts):
-            with open(f"test/test_{buffer_index+1}_{mp3_index+1}.mp3", "wb") as f:
-                f.write(mp3_part[mp3_index])
+
+        with open(f"test/test_{buffer_index+1}.mp3", "wb") as f:
+            for mp3_index, mp3_part in enumerate(mp3_parts):
+                for key, val in mp3_part.items():
+                    f.write(val)
 
         end_time = time.time()
         execution_time = end_time - start_time
@@ -87,6 +89,7 @@ async def tts_all(sentences, ext_num):
 
 async def tts_one(index, text):
     print(f"th{index + 1} started")
+    audio_bytes = None
     for repeat_num in range(0, REPEAT_REQUEST_COUNT):
         repeat_str = f"repeat{repeat_num} "
         try:
@@ -104,6 +107,9 @@ async def tts_one(index, text):
             break
         except Exception as ex:
             print(f"{repeat_str}th{index + 1}={ex}")
+            if repeat_num+1 == REPEAT_REQUEST_COUNT:
+                raise ex
+            time.sleep(1)
     return {index: audio_bytes}
 
 
@@ -116,7 +122,7 @@ def write_to_file(mp3_parts):
 
 
 def get_text():
-    with open('text.txt', 'r', encoding='utf-8') as file:
+    with open('textFull.txt', 'r', encoding='utf-8') as file:
         text = file.read()
     return text
 
