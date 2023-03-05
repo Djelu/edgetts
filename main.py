@@ -6,14 +6,14 @@ import time
 from faker import Faker
 import edge_tts
 
-REPEAT_REQUEST_COUNT = 10
+REPEAT_REQUEST_COUNT = 100
 
 
 async def foo(buffer_size):
     text = get_text()
     # text = get_fake_text(111111)
     # start_time = time.time()
-    splited = prepare_splited_text(text, buffer_size, 1000, 2000)
+    splited = prepare_splited_text(text, buffer_size, 500, 2000)
     # res = list(map(lambda str: {'len': len(str), 'text': str}, splited))
     # mp3 = await tts_one(0, text)
 
@@ -31,6 +31,11 @@ async def foo(buffer_size):
     i = 0
 
 
+def split_text(text):
+    substrings = re.split(r'([:;\-,.!?])(?:\s+|\n)', text)
+    return ["".join(substrings[i:i + 2]) for i in range(0, len(substrings), 2)]
+
+
 async def run_it_with_buffer(sentences, buffer_size):
     result = []
     sum_time = 0
@@ -41,8 +46,7 @@ async def run_it_with_buffer(sentences, buffer_size):
         mp3_parts = await tts_all(buffered_sentences, ext_num)
         result.append(mp3_parts)
 
-
-        with open(f"test/test_{buffer_index+1}.mp3", "wb") as f:
+        with open(f"test/test_{buffer_index + 1}.mp3", "wb") as f:
             for mp3_index, mp3_part in enumerate(mp3_parts):
                 for key, val in mp3_part.items():
                     f.write(val)
@@ -60,9 +64,9 @@ def get_splited_sentences(sentences, count):
 
 
 def prepare_splited_text(text, buffer_size, first_strings_len, last_strings_len):
-    words = text.split(" ")
-    first_part = strip_strings(words, first_strings_len, buffer_size)
-    last_part = strip_strings(words[first_part['last_word_index'] + 1:], last_strings_len)
+    parts = split_text(text)
+    first_part = strip_strings(parts, first_strings_len, buffer_size)
+    last_part = strip_strings(parts[first_part['last_word_index'] + 1:], last_strings_len)
     return [*first_part['result'], *last_part['result']]
 
 
@@ -107,7 +111,7 @@ async def tts_one(index, text):
             break
         except Exception as ex:
             print(f"{repeat_str}th{index + 1}={ex}")
-            if repeat_num+1 == REPEAT_REQUEST_COUNT:
+            if repeat_num + 1 == REPEAT_REQUEST_COUNT:
                 raise ex
             time.sleep(1)
     return {index: audio_bytes}
@@ -122,7 +126,7 @@ def write_to_file(mp3_parts):
 
 
 def get_text():
-    with open('textFull.txt', 'r', encoding='utf-8') as file:
+    with open('text.txt', 'r', encoding='utf-8') as file:
         text = file.read()
     return text
 
